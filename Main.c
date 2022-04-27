@@ -1,5 +1,4 @@
-// BFS algorithm in C
-
+// Serial BFS algorithm in C
 #include <stdio.h>
 #include <stdlib.h>
 #define SIZE 40
@@ -9,7 +8,7 @@ struct queue {
   int front;
   int rear;
 };
-
+int * visited;
 struct queue* createQueue();
 void enqueue(struct queue* q, int);
 int dequeue(struct queue* q);
@@ -17,17 +16,11 @@ void display(struct queue* q);
 int isEmpty(struct queue* q);
 void printQueue(struct queue* q);
 
-struct node {
-  int vertex;
-  struct node* next;
-};
-
-struct node* createNode(int);
-
 struct Graph {
   int numVertices;
-  struct node** adjLists;
-  int* visited;
+  int  **adjMatrix;
+  int *degree;
+  int * visited;
 };
 
 // BFS algorithm
@@ -37,31 +30,23 @@ void bfs(struct Graph* graph, int startVertex) {
   graph->visited[startVertex] = 1;
   enqueue(q, startVertex);
 
-  while (!isEmpty(q)) {
+  while (isEmpty(q)!=1) {
+    //printf("\nHI!");
     printQueue(q);
     int currentVertex = dequeue(q);
     printf("Visited %d\n", currentVertex);
-
-    struct node* temp = graph->adjLists[currentVertex];
-
-    while (temp) {
-      int adjVertex = temp->vertex;
-
-      if (graph->visited[adjVertex] == 0) {
-        graph->visited[adjVertex] = 1;
-        enqueue(q, adjVertex);
-      }
-      temp = temp->next;
+    for(int i=0; i<graph->numVertices;i++){
+      //isEmpty(q);
+      //printf("vertics=%d,i=%d",graph->numVertices,i);
+        int temp=graph->adjMatrix[currentVertex][i];
+        //printf("\nTemp: %d & Visited Value: %d",temp,graph->visited[temp]);
+        if(!graph->visited[temp]){
+            enqueue(q,temp);
+            graph->visited[temp]=1;
+        }
     }
+    //printf("BYE!");
   }
-}
-
-// Creating a node
-struct node* createNode(int v) {
-  struct node* newNode = malloc(sizeof(struct node));
-  newNode->vertex = v;
-  newNode->next = NULL;
-  return newNode;
 }
 
 // Creating a graph
@@ -69,29 +54,27 @@ struct Graph* createGraph(int vertices) {
   struct Graph* graph = malloc(sizeof(struct Graph));
   graph->numVertices = vertices;
 
-  graph->adjLists = malloc(vertices * sizeof(struct node*));
-  graph->visited = malloc(vertices * sizeof(int));
+  graph->adjMatrix = malloc((vertices* sizeof(int))+1);
+  graph->visited = malloc((vertices * sizeof(int))+1);
+  graph->degree=malloc((vertices * sizeof(int))+1);
 
   int i;
   for (i = 0; i < vertices; i++) {
-    graph->adjLists[i] = NULL;
-    graph->visited[i] = 0;
+    graph->adjMatrix[i] = malloc((vertices * sizeof(int))+1);
+    //printf("Visited Creation:%d\n",graph->visited[i]);
+    //graph->visited[i] = 0;
   }
 
   return graph;
 }
 
 // Add edge
-void addEdge(struct Graph* graph, int src, int dest) {
+void addEdge(struct Graph* graph, int vertex,int element) {
   // Add edge from src to dest
-  struct node* newNode = createNode(dest);
-  newNode->next = graph->adjLists[src];
-  graph->adjLists[src] = newNode;
-
-  // Add edge from dest to src
-  newNode = createNode(src);
-  newNode->next = graph->adjLists[dest];
-  graph->adjLists[dest] = newNode;
+  //graph->adjMatrix[vertex][graph->degree[vertex]++]=element;
+  //graph->adjMatrix[element][graph->degree[element]++]=vertex;
+  graph->adjMatrix[vertex][element]=element;
+  graph->adjMatrix[element][vertex]=vertex;
 }
 
 // Create a queue
@@ -106,8 +89,7 @@ struct queue* createQueue() {
 int isEmpty(struct queue* q) {
   if (q->rear == -1)
     return 1;
-  else
-    return 0;
+ return 0;
 }
 
 // Adding elements into queue
@@ -134,8 +116,10 @@ int dequeue(struct queue* q) {
     if (q->front > q->rear) {
       printf("Resetting queue ");
       q->front = q->rear = -1;
+      //printQueue(q);
     }
   }
+  //printf("ITEM%d",item);
   return item;
 }
 
@@ -152,7 +136,6 @@ void printQueue(struct queue* q) {
     }
   }
 }
-
 int main() {
   struct Graph* graph = createGraph(6);
   addEdge(graph, 0, 1);
@@ -162,7 +145,17 @@ int main() {
   addEdge(graph, 1, 3);
   addEdge(graph, 2, 4);
   addEdge(graph, 3, 4);
-
+  printf("OUR GRAPH!\n");
+  for(int i=0; i<graph->numVertices;i++){
+    for(int j=0;j<graph->numVertices;j++){
+      printf("%d",graph->adjMatrix[i][j]);
+    }
+    printf("\n");
+  }
+  //printf("NUMBER!!!!%d\n",graph->numVertices);
+  for(int i=0; i<graph->numVertices;i++){
+    graph->visited[i]=0;
+  }
   bfs(graph, 0);
 
   return 0;
