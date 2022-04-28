@@ -1,60 +1,46 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include<time.h>
+#include <time.h>
 #include <mpi.h>
 
-#define ARRAY_SIZE 10
+#define ARRAY_SIZE 1000
 
+// Binary Search
 int binarySearch(int arr[], int target, int left, int right)
 {
-	/*
-	 * Binary Search Algorithm
-	 */
-    left = 0;
-    right = strlen(arr)-1;
-	int mid_point = (left + right) / 2;
 
+	int mid_point =  (left + right) / 2;
 	if(arr[mid_point] == target)
 		return mid_point;
+
 	else if(left>right)
 		return -1;
-    while(left<=right){
-        if(arr[mid_point]<target){
-            left=mid_point+1;
-        }else if(arr[mid_point]==target){
-            printf("Target %d found at index %d",arr[mid_point],mid_point);
-            break;
-        }else{
-            right=mid_point-1;
-            mid_point=(right+left)/2;
-        }
-    }
-	// else if(target > arr[mid_point])
-	// 	return binarySearch(arr, target, mid_point + 1, right);
-	// else
-	// 	return binarySearch(arr, target, left, mid_point - 1);
 
-	// return -1;
+	else if (target > arr[mid_point])
+		return binarySearch(arr, target, mid_point + 1, right);
+	else
+		return binarySearch(arr, target, left, mid_point - 1);
+
+	return -1;
 }
 
+// Insertion sort
 void insertionSort(int arr[], int n)
 {
-	/*
-	 * Insertion Sort Algorithm
-	 */
-
-	int i, j, key;
+	int i;
+    int j;
+    int target;
 
 	for(i = 1; i < n; ++i)
 	{
-		key = arr[i];
+	 target = arr[i];
 		j = i - 1;
-		while(j >= 0 && key < arr[j])
+		while(j >= 0 && target < arr[j])
 		{
 			arr[j + 1] = arr[j];
 			j = j  - 1;
 		}
-		arr[j + 1] = key;
+		arr[j + 1] = target;
 	}
 
 }
@@ -64,139 +50,153 @@ int main(int argc, char** argv)
 	static int arr[ARRAY_SIZE];
 	time_t t;
 	int i;
-	size_t n = sizeof(arr)/sizeof(arr[0]);
+	size_t n = sizeof(arr) / sizeof(arr[0]);
+	int target;
 
-	// a data struct that provides more information on the received  message
 	MPI_Status status;
 
+    // MPI Environment
 	// Initialize the MPI environment
-	MPI_Init(NULL, NULL);
-
+	MPI_Init(&argc, &argv);
 	// Get the rank of the process
-	int pid;
-	MPI_Comm_rank(MPI_COMM_WORLD, &pid);
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	// Get the number of processes	
+	int size;
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	
+    // Get runtime
+    MPI_Barrier(MPI_COMM_WORLD);
+    double start = MPI_Wtime();
 
-	// Get the number of processes
-	int number_of_processes;
-	MPI_Comm_size(MPI_COMM_WORLD, &number_of_processes);
-
-	if (pid == 0) {
-
-		// master process
-
+    // Master process
+	if (rank == 0) {
 		srand((unsigned) time(&t));
 
 		for( i = 0 ; i < n ; ++i )
 			arr[i] = rand() % 50;
 
 
-		int index, i;
-		int elements_per_process;
+		int index;
+        int i;
+		int num_per_process;
 
 		srand((unsigned) time(&t));
-		int key = rand() % 50;
+		
+		target = rand() % 50;
 
+		num_per_process = ARRAY_SIZE / size;
 
-		elements_per_process = ARRAY_SIZE / number_of_processes;
+		if (size > 1) {
 
-		// check if more than 1 processes are running
-		if (number_of_processes > 1) {
-			// distributes the portion of the array among all processes
-			for (i = 1; i < number_of_processes - 1; i++) {
-				index = i * elements_per_process;
+			for (i = 1; i < size - 1; i++) {
+				index = i * num_per_process;
 
-				MPI_Send(&key,
-						1, MPI_INT, i, 0,
-						MPI_COMM_WORLD);
-				MPI_Send(&elements_per_process,
-						1, MPI_INT, i, 0,
-						MPI_COMM_WORLD);
-				MPI_Send(&arr[index],
-						elements_per_process,
-						MPI_INT, i, 0,
-						MPI_COMM_WORLD);
+				MPI_Send(&target,1, MPI_INT, i, 0,MPI_COMM_WORLD);
+
+				MPI_Send(&num_per_process,1, MPI_INT, i, 1,MPI_COMM_WORLD);
+
+				MPI_Send(&arr[index],num_per_process,MPI_INT, i, 2,MPI_COMM_WORLD);
+				//printf("Send to process %d",i);
 			}
 
-			// last process adds remaining elements
-			index = i * elements_per_process;
+	
+			index = i * num_per_process;
 			int elements_left = ARRAY_SIZE - index;
 
-			MPI_Send(&key,
-					1, MPI_INT,
-					i, 0,
-					MPI_COMM_WORLD);
-			MPI_Send(&elements_left,
-					1, MPI_INT,
-					i, 0,
-					MPI_COMM_WORLD);
-			MPI_Send(&arr[index],
-					elements_left,
-					MPI_INT, i, 0,
-					MPI_COMM_WORLD);
+			MPI_Send(&target,1, MPI_INT,i, 0,MPI_COMM_WORLD);
+
+			MPI_Send(&elements_left,1, MPI_INT,i, 1,MPI_COMM_WORLD);
+
+			MPI_Send(&arr[index],elements_left,MPI_INT, i, 2,MPI_COMM_WORLD);
+			//printf("Send to process %d",i);
+					
+					
 		}
 
-		// master process sorts its portion of the array
-		insertionSort(arr, elements_per_process);
+		insertionSort(arr, num_per_process);
 
 
-		index = binarySearch(arr, key, 0, elements_per_process);
+		index = binarySearch(arr, target, 0, num_per_process);
 
-		// master process collects the searching result
-		if (index == - 1)
-			for (i = 1; i < number_of_processes; i++) {
-				MPI_Recv(&index, 1, MPI_INT,
-						MPI_ANY_SOURCE, 0,
-						MPI_COMM_WORLD,
-						&status);
-				if (index == -1)
-					printf("the key %d is not in the array\n", key);
-				else
-					printf("the key %d is found in the array\n", key);
+		if (index == - 1){
+			for (i = 1; i < size; i++) {
+				MPI_Recv(&index, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+				if (index == -1){
+					//printf("Process %d", status.MPI_SOURCE);
+					printf("The target %d is not found in the array\n", target);
+				}
+				else{
+					//printf("Process %d", status.MPI_SOURCE);
+					printf("The target %d is found in the array\n", target);}
 			}
-		else
-			printf("the key %d is found in the array\n", key);
+		}
+		else{
+			//printf("Process ABDALLAH");
+			printf("The target %d is found in the array\n", target);}
+			
 
-	} else
+	} 
+	else
 	{
-		// worker processes
 
-		int key = 0;
+		target = 0;
 
-		// receive the key
-		MPI_Recv(&key,
-				1, MPI_INT, 0, 0,
-				MPI_COMM_WORLD,
-				&status);
+		MPI_Recv(&target,1, MPI_INT, 0, 0,MPI_COMM_WORLD,&status);
 
-		// receive the size of its portion of the array
-		int num_of_elements_recieved = 0;
-		MPI_Recv(&num_of_elements_recieved,
-				1, MPI_INT, 0, 0,
-				MPI_COMM_WORLD,
-				&status);
+		int num_of_elements_received = 0;
+		MPI_Recv(&num_of_elements_received,1, MPI_INT, 0, 1,MPI_COMM_WORLD,&status);
 
-		int buffer[num_of_elements_recieved];
+		int buffer[num_of_elements_received];
 		size_t n = sizeof(buffer)/sizeof(buffer[0]);
 
-		// receive its portion of the array and store it in buffer
-		MPI_Recv(&buffer, num_of_elements_recieved,
-				MPI_INT, 0, 0,
-				MPI_COMM_WORLD,
-				&status);
+		MPI_Recv(&buffer, num_of_elements_received,MPI_INT, 0, 2,MPI_COMM_WORLD,&status);
 
-		// sort its portion of the array
 		insertionSort(buffer, n);
 
-		// search for the key in its portion of the array
-		int index = binarySearch(buffer, key, 0, n);
+		int index = binarySearch(buffer, target, 0, n);
+		printf("%d ",index);
 
-		// send the searching result to the master process
-		MPI_Send(&index, 1, MPI_INT,
-				0, 0, MPI_COMM_WORLD);
+		MPI_Send(&index, 1, MPI_INT,0, 0, MPI_COMM_WORLD);
 	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+ 	double right = MPI_Wtime();
+
+    if (rank == 0){
+        printf("Total time parallel: %fs\n", right-start);
+
+		clock_t start_t, end_t, total_t;
+   int i;
+
+   start_t = clock();
+   printf("Starting of the program, start_t = %ld\n", start_t);
+        insertionSort(arr, ARRAY_SIZE);
+        if (binarySearch(arr,target, 0, ARRAY_SIZE) == -1){
+					printf("The target %d is not found in the array serially\n", target);
+				
+				}
+		else{
+			printf("The target %d is found in the array serially\n", target);
+					
+		}		
+
+		end_t = clock();
+   printf("End of the big loop, end_t = %ld\n", end_t);
+   
+  printf("%Lf", (long double)(end_t - start_t));
+        
+		
+       
+
+
+        
+    }
 
 	// Finalize the MPI environment
 	MPI_Finalize();
+
+
 
 	return 0;
 }
